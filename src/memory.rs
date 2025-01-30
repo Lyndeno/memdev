@@ -25,7 +25,7 @@ impl MemDevice {
     /// Returns error if getting memory information fails
     pub fn new(index: usize, memmap: &HashMap<String, String>) -> Self {
         let mut propmap = HashMap::new();
-        for (key, value) in memmap.iter() {
+        for (key, value) in memmap {
             if let Some(name) = key.strip_prefix(&format!("MEMORY_DEVICE_{index}_")) {
                 propmap.insert(name.to_string(), value.to_string());
             }

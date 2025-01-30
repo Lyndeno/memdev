@@ -1,5 +1,7 @@
 use memdev::memory::Memory;
-fn main() {
-    let mem = Memory::new().unwrap();
-    println!("{:?}", mem);
+use memdev::Result;
+fn main() -> Result<()> {
+    let mem = Memory::new()?;
+    println!("{mem:?}");
+    Ok(())
 }
