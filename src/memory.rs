@@ -1,19 +1,22 @@
 use crate::{Error, Result};
-use measurements::Data;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::str::FromStr;
 use udev::{Device, Entry};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Memory {
     pub devices: Option<Vec<MemDevice>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MemDevice {
-    properties: HashMap<String, String>,
+    manufacturer: Option<String>,
+    frequency: Option<u64>,
+    form_factor: Option<String>,
+    mem_type: Option<String>,
+    extra_props: HashMap<String, String>,
 }
 
 impl MemDevice {
@@ -42,31 +45,35 @@ impl MemDevice {
             }
         }
 
-        Ok(MemDevice {
-            properties: propmap,
-        })
-    }
-    pub fn frequency(&self) -> Option<usize> {
-        self.pull_value("CONFIGURED_SPEED_MTS")
-    }
-
-    pub fn manufactuer(&self) -> Option<String> {
-        self.pull_value("MANUFACTURER")
-    }
-
-    pub fn form_factor(&self) -> Option<String> {
-        self.pull_value("FORM_FACTOR")
-    }
-
-    pub fn get_type(&self) -> Option<String> {
-        self.pull_value("TYPE")
+        Ok(MemDevice::from(propmap))
     }
 
     fn pull_value<T: FromStr>(&self, name: &str) -> Option<T> {
-        if let Some(v) = self.properties.get(name) {
+        if let Some(v) = self.extra_props.get(name) {
             return str::parse::<T>(v).ok();
         }
         None
+    }
+}
+
+impl From<HashMap<String, String>> for MemDevice {
+    fn from(mut extra_props: HashMap<String, String>) -> Self {
+        //let mut extra_props = value.clone();
+        let manufacturer = extra_props.remove("MANUFACTURER");
+        let frequency = extra_props
+            .remove("CONFIGURED_SPEED_MTS")
+            .map(|x| str::parse::<u64>(&x).ok())
+            .flatten();
+        let form_factor = extra_props.remove("FORM_FACTOR");
+        let mem_type = extra_props.remove("TYPE");
+
+        Self {
+            manufacturer,
+            frequency,
+            form_factor,
+            mem_type,
+            extra_props,
+        }
     }
 }
 
@@ -107,7 +114,7 @@ impl Memory {
         let mut memtype = Vec::new();
         if let Some(v) = &self.devices {
             for dev in v {
-                if let Some(x) = dev.get_type() {
+                if let Some(x) = dev.mem_type.clone() {
                     memtype.push(x);
                 }
             }
@@ -128,7 +135,7 @@ impl Memory {
         let mut memff = Vec::new();
         if let Some(v) = &self.devices {
             for dev in v {
-                if let Some(x) = dev.form_factor() {
+                if let Some(x) = dev.form_factor.clone() {
                     memff.push(x);
                 }
             }
@@ -143,11 +150,11 @@ impl Memory {
         string_vec
     }
 
-    fn get_speed(&self) -> Vec<usize> {
+    fn get_speed(&self) -> Vec<u64> {
         let mut speeds = Vec::new();
         if let Some(v) = &self.devices {
             for dev in v {
-                if let Some(x) = dev.frequency() {
+                if let Some(x) = dev.frequency {
                     speeds.push(x);
                 }
             }
@@ -202,7 +209,7 @@ fn print_strings(strings: Vec<String>) -> Option<String> {
     }
 }
 
-fn sum_frequency(f: Vec<usize>) -> usize {
+fn sum_frequency(f: Vec<u64>) -> u64 {
     let mut sum = 0;
     for freq in f {
         sum += freq;
@@ -211,10 +218,10 @@ fn sum_frequency(f: Vec<usize>) -> usize {
 }
 
 #[allow(clippy::cast_precision_loss)]
-fn avg_frequency(f: Vec<usize>) -> usize {
+fn avg_frequency(f: Vec<u64>) -> u64 {
     let count = f.len();
     if count > 0 {
-        sum_frequency(f) / count
+        sum_frequency(f) / count as u64
     } else {
         0
     }
