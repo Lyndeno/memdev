@@ -1,15 +1,19 @@
 use crate::{Error, Result};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use udev::{Device, Entry};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone)]
 pub struct Memory {
     pub devices: Vec<MemDevice>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone)]
 pub struct MemDevice {
     pub manufacturer: Option<String>,
     pub frequency: Option<u64>,
