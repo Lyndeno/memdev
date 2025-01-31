@@ -103,34 +103,7 @@ impl Memory {
     /// Does not error on failure to obtain smbios information
     pub fn new() -> Result<Self> {
         let udev = Device::from_syspath(Path::new("/sys/devices/virtual/dmi/id"))?;
-        let props = udev.properties();
-        let props_vec: Vec<Entry<'_>> = props.collect();
-
-        let mut propmap = HashMap::new();
-
-        for prop in props_vec {
-            let k = prop.name().to_string_lossy().to_string();
-            let v = prop.value().to_string_lossy().to_string();
-            propmap.insert(k, v);
-        }
-
-        let count_entry = propmap
-            .get("MEMORY_ARRAY_NUM_DEVICES")
-            .ok_or(Error::Missing)?;
-
-        let count = str::parse::<usize>(count_entry)?;
-
-        let mut devs = Vec::with_capacity(count);
-
-        for i in 0..count {
-            devs.push(MemDevice::new(i, &propmap));
-        }
-
-        Ok(Self {
-            // This will usually error do to permission errors, so just wrap it None instead
-            // as it is not needed for basic use
-            devices: devs,
-        })
+        Self::try_from(udev)
     }
 
     pub fn avg_frequency(&self) -> u64 {
@@ -141,6 +114,45 @@ impl Memory {
             }
         }
         avg_frequency(v)
+    }
+}
+
+impl TryFrom<udev::Device> for Memory {
+    type Error = Error;
+    fn try_from(value: udev::Device) -> std::result::Result<Self, Self::Error> {
+        let props = value.properties();
+        let props_vec: Vec<Entry<'_>> = props.collect();
+
+        let mut propmap = HashMap::new();
+
+        for prop in props_vec {
+            let k = prop.name().to_string_lossy().to_string();
+            let v = prop.value().to_string_lossy().to_string();
+            propmap.insert(k, v);
+        }
+
+        Self::try_from(propmap)
+    }
+}
+
+impl TryFrom<HashMap<String, String>> for Memory {
+    type Error = Error;
+    fn try_from(map: HashMap<String, String>) -> std::result::Result<Self, Self::Error> {
+        let count_entry = map.get("MEMORY_ARRAY_NUM_DEVICES").ok_or(Error::Missing)?;
+
+        let count = str::parse::<usize>(count_entry)?;
+
+        let mut devs = Vec::with_capacity(count);
+
+        for i in 0..count {
+            devs.push(MemDevice::new(i, &map));
+        }
+
+        Ok(Self {
+            // This will usually error do to permission errors, so just wrap it None instead
+            // as it is not needed for basic use
+            devices: devs,
+        })
     }
 }
 
