@@ -50,7 +50,7 @@ impl std::fmt::Display for MemType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             MemType::Other(v) => v.to_string(),
-            t => format!("{t:?}"),
+            t => format!("{t:?}").to_uppercase(),
         };
         write!(f, "{s}")
     }
